@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Geography Quiz</title>
+  <style>
+  /* Reset & base */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: #000;
+  color: #fff;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* Starfield: layered radial-gradient stars + faint nebula glow */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(1.5px 1.5px at 20px 30px, #fff, transparent),
+    radial-gradient(1px 1px at 80px 120px, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 160px 60px, #fff, transparent),
+    radial-gradient(1px 1px at 220px 200px, #ddd, transparent),
+    radial-gradient(2px 2px at 300px 90px, #fff, transparent),
+    radial-gradient(1px 1px at 380px 250px, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 50px 280px, #fff, transparent),
+    radial-gradient(1px 1px at 140px 350px, #ccc, transparent),
+    radial-gradient(1px 1px at 260px 330px, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 350px 380px, #fff, transparent);
+  background-repeat: repeat;
+  background-size: 400px 400px;
+  animation: drift 120s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(1px 1px at 60px 90px, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 180px 40px, #fff, transparent),
+    radial-gradient(1px 1px at 280px 180px, #aaa, transparent),
+    radial-gradient(1px 1px at 360px 300px, #fff, transparent),
+    radial-gradient(2px 2px at 100px 220px, #fff, transparent),
+    radial-gradient(circle at 30% 20%, rgba(80, 120, 255, 0.12), transparent 50%),
+    radial-gradient(circle at 75% 80%, rgba(180, 80, 200, 0.1), transparent 50%);
+  background-repeat: repeat, repeat, repeat, repeat, repeat, no-repeat, no-repeat;
+  background-size: 500px 500px, 500px 500px, 500px 500px, 500px 500px, 500px 500px, 100% 100%, 100% 100%;
+  animation: twinkle 4s ease-in-out infinite alternate;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes drift { from { background-position: 0 0; } to { background-position: 400px 400px; } }
+@keyframes twinkle { from { opacity: 0.6; } to { opacity: 1; } }
+
+.quiz-container { width: 100%; max-width: 600px; position: relative; z-index: 1; }
+
+/* Glassmorphism card */
+.card {
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 24px;
+  padding: 32px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  animation: fadeIn 0.5s ease;
+}
+
+.hidden { display: none; }
+
+.quiz-header {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 14px; font-weight: 600; margin-bottom: 16px; opacity: 0.9;
+}
+.timer {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,0.15); padding: 6px 14px; border-radius: 999px;
+}
+
+.progress-bar {
+  width: 100%; height: 6px; background: rgba(255,255,255,0.2);
+  border-radius: 999px; overflow: hidden; margin-bottom: 28px;
+}
+#progress-fill {
+  height: 100%; width: 0;
+  background: linear-gradient(90deg, #fbc2eb, #a6c1ee);
+  border-radius: 999px; transition: width 0.4s ease;
+}
+
+.question { font-size: 22px; font-weight: 700; line-height: 1.4; margin-bottom: 24px; animation: slideUp 0.4s ease; }
+
+.answers { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+.answers li {
+  background: rgba(255,255,255,0.1);
+  border: 2px solid rgba(255,255,255,0.2);
+  padding: 14px 18px; border-radius: 14px;
+  cursor: pointer; font-size: 16px; font-weight: 500;
+  transition: all 0.25s ease;
+  animation: slideUp 0.4s ease backwards;
+}
+.answers li:nth-child(1){animation-delay:.05s}
+.answers li:nth-child(2){animation-delay:.1s}
+.answers li:nth-child(3){animation-delay:.15s}
+.answers li:nth-child(4){animation-delay:.2s}
+
+.answers li:hover:not(.disabled) {
+  background: rgba(255,255,255,0.2);
+  transform: translateY(-2px);
+  border-color: rgba(255,255,255,0.4);
+}
+.answers li.correct {
+  background: linear-gradient(135deg, #00c896, #00a878);
+  border-color: #00ffaa; animation: pop 0.4s ease;
+}
+.answers li.wrong {
+  background: linear-gradient(135deg, #ff5e7e, #d63862);
+  border-color: #ff8aa3; animation: shake 0.4s ease;
+}
+.answers li.disabled { cursor: not-allowed; }
+
+.quiz-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 24px; }
+.score { font-weight: 600; font-size: 15px; }
+
+.btn {
+  background: linear-gradient(135deg, #fff, #e9e4ff);
+  color: #5a3dbb; border: none;
+  padding: 12px 28px; border-radius: 999px;
+  font-size: 15px; font-weight: 700; cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+}
+.btn:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+.btn:active { transform: translateY(0); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.btn-large { padding: 14px 40px; font-size: 16px; margin-top: 16px; }
+
+#result-screen { text-align: center; }
+.trophy { font-size: 72px; margin-bottom: 8px; animation: pop 0.6s ease; }
+#result-screen h1 { font-size: 28px; margin-bottom: 8px; }
+.result-text { opacity: 0.85; margin-bottom: 8px; }
+.final-score {
+  font-size: 48px; font-weight: 800; margin: 12px 0;
+  background: linear-gradient(135deg, #fbc2eb, #fff);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.result-message { opacity: 0.9; font-size: 16px; }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pop { 0% { transform: scale(0.9); } 60% { transform: scale(1.05); } 100% { transform: scale(1); } }
+@keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+
+@media (max-width: 480px) {
+  .card { padding: 22px; border-radius: 20px; }
+  .question { font-size: 18px; }
+  .answers li { font-size: 14px; padding: 12px 14px; }
+  .final-score { font-size: 38px; }
+  .quiz-footer { flex-direction: column; gap: 12px; align-items: stretch; }
+  .btn { width: 100%; }
+}
+  </style>
+</head>
+<body>
+  <div class="quiz-container">
+    <!-- Quiz Screen -->
+    <div id="quiz-screen" class="card">
+      <div class="quiz-header">
+        <div class="progress">
+          Question <span id="current-q">1</span> / <span id="total-q">0</span>
+        </div>
+        <div class="timer">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/>
+          </svg>
+          <span id="time">15</span>s
+        </div>
+      </div>
+
+      <div class="progress-bar"><div id="progress-fill"></div></div>
+
+      <h2 id="question" class="question"></h2>
+
+      <ul id="answers" class="answers"></ul>
+
+      <div class="quiz-footer">
+        <div class="score">Score: <span id="score">0</span></div>
+        <button id="next-btn" class="btn">Next →</button>
+      </div>
+    </div>
+
+    <!-- Result Screen -->
+    <div id="result-screen" class="card hidden">
+      <div class="trophy">🏆</div>
+      <h1>Quiz Completed!</h1>
+      <p class="result-text">You scored</p>
+      <div class="final-score"><span id="final-score">0</span> / <span id="final-total">0</span></div>
+      <p id="result-message" class="result-message"></p>
+      <button id="restart-btn" class="btn btn-large">Restart Quiz</button>
+    </div>
+  </div>
+
+  <script>
+  // ========== Quiz Data ==========
+const questions = [
+  { question: "What is the capital of Australia?", answers: ["Sydney", "Melbourne", "Canberra", "Perth"], correct: 2 },
+  { question: "Which is the longest river in the world?", answers: ["Amazon", "Nile", "Yangtze", "Mississippi"], correct: 1 },
+  { question: "Mount Everest is located in which mountain range?", answers: ["Andes", "Rockies", "Alps", "Himalayas"], correct: 3 },
+  { question: "Which country has the largest population?", answers: ["China", "USA", "India", "Indonesia"], correct: 2 },
+  { question: "The Sahara Desert is located on which continent?", answers: ["Asia", "Africa", "Australia", "South America"], correct: 1 },
+  { question: "Which ocean is the largest?", answers: ["Atlantic", "Indian", "Arctic", "Pacific"], correct: 3 },
+  { question: "What is the capital of Canada?", answers: ["Toronto", "Vancouver", "Ottawa", "Montreal"], correct: 2 },
+  { question: "Which country is known as the Land of the Rising Sun?", answers: ["China", "Japan", "Thailand", "South Korea"], correct: 1 },
+  { question: "Which is the smallest country in the world?", answers: ["Monaco", "Maldives", "Vatican City", "San Marino"], correct: 2 },
+  { question: "The Great Barrier Reef is located off the coast of which country?", answers: ["Brazil", "Australia", "Mexico", "Philippines"], correct: 1 },
+  { question: "Which river flows through Egypt?", answers: ["Tigris", "Euphrates", "Nile", "Congo"], correct: 2 },
+  { question: "What is the capital of Brazil?", answers: ["Rio de Janeiro", "São Paulo", "Salvador", "Brasília"], correct: 3 },
+  { question: "Which mountain is the highest in Africa?", answers: ["Mount Kenya", "Mount Kilimanjaro", "Atlas", "Drakensberg"], correct: 1 },
+  { question: "Which country has the most time zones?", answers: ["Russia", "USA", "China", "France"], correct: 3 },
+  { question: "Which sea lies between Europe and Africa?", answers: ["Red Sea", "Black Sea", "Mediterranean Sea", "Caspian Sea"], correct: 2 },
+];
+
+// ========== State ==========
+let currentIndex = 0;       // index of current question
+let score = 0;              // user's score
+let timer = null;           // timer interval reference
+let timeLeft = 15;          // seconds left for current question
+const TIME_PER_Q = 15;      // seconds per question
+let answered = false;       // whether current question was answered
+
+// ========== DOM references ==========
+const quizScreen = document.getElementById("quiz-screen");
+const resultScreen = document.getElementById("result-screen");
+const questionEl = document.getElementById("question");
+const answersEl = document.getElementById("answers");
+const nextBtn = document.getElementById("next-btn");
+const scoreEl = document.getElementById("score");
+const currentQEl = document.getElementById("current-q");
+const totalQEl = document.getElementById("total-q");
+const timeEl = document.getElementById("time");
+const progressFill = document.getElementById("progress-fill");
+const finalScoreEl = document.getElementById("final-score");
+const finalTotalEl = document.getElementById("final-total");
+const resultMessage = document.getElementById("result-message");
+const restartBtn = document.getElementById("restart-btn");
+
+// ========== Init ==========
+totalQEl.textContent = questions.length;
+loadQuestion();
+
+nextBtn.addEventListener("click", handleNext);
+restartBtn.addEventListener("click", restartQuiz);
+
+// Load the current question into the UI
+function loadQuestion() {
+  answered = false;
+  nextBtn.disabled = true;
+
+  const q = questions[currentIndex];
+  questionEl.textContent = q.question;
+  currentQEl.textContent = currentIndex + 1;
+  answersEl.innerHTML = "";
+
+  // Update progress bar width
+  progressFill.style.width = `${(currentIndex / questions.length) * 100}%`;
+
+  // Render answer choices as <li> items
+  q.answers.forEach((answer, i) => {
+    const li = document.createElement("li");
+    li.textContent = answer;
+    li.addEventListener("click", () => selectAnswer(li, i));
+    answersEl.appendChild(li);
+  });
+
+  startTimer();
+}
+
+// Start countdown timer for current question
+function startTimer() {
+  clearInterval(timer);
+  timeLeft = TIME_PER_Q;
+  timeEl.textContent = timeLeft;
+
+  timer = setInterval(() => {
+    timeLeft--;
+    timeEl.textContent = timeLeft;
+    if (timeLeft <= 0) {
+      clearInterval(timer);
+      revealAnswer(null); // time up — no selection
+    }
+  }, 1000);
+}
+
+// Handle user clicking an answer
+function selectAnswer(li, index) {
+  if (answered) return;
+  revealAnswer(index, li);
+}
+
+// Highlight correct/wrong answers and lock all choices
+function revealAnswer(selectedIndex) {
+  answered = true;
+  clearInterval(timer);
+
+  const correctIndex = questions[currentIndex].correct;
+  const items = answersEl.querySelectorAll("li");
+
+  items.forEach((li, i) => {
+    li.classList.add("disabled");
+    if (i === correctIndex) li.classList.add("correct");
+    if (selectedIndex !== null && i === selectedIndex && i !== correctIndex) {
+      li.classList.add("wrong");
+    }
+  });
+
+  // Increment score if the user picked the right answer
+  if (selectedIndex === correctIndex) {
+    score++;
+    scoreEl.textContent = score;
+  }
+
+  nextBtn.disabled = false;
+  // Change button label on the last question
+  if (currentIndex === questions.length - 1) {
+    nextBtn.textContent = "Finish →";
+  }
+}
+
+// Move to next question or show final result
+function handleNext() {
+  currentIndex++;
+  if (currentIndex < questions.length) {
+    loadQuestion();
+  } else {
+    showResults();
+  }
+}
+
+// Display the result screen with score and message
+function showResults() {
+  clearInterval(timer);
+  quizScreen.classList.add("hidden");
+  resultScreen.classList.remove("hidden");
+  finalScoreEl.textContent = score;
+  finalTotalEl.textContent = questions.length;
+
+  const pct = (score / questions.length) * 100;
+  let msg = "";
+  if (pct === 100) msg = "Perfect score! You're a geography genius! 🌍";
+  else if (pct >= 70) msg = "Great job! Keep exploring. 👏";
+  else if (pct >= 40) msg = "Not bad — try again to improve!";
+  else msg = "Keep practicing — the world awaits! 💪";
+  resultMessage.textContent = msg;
+}
+
+// Reset quiz state and start over
+function restartQuiz() {
+  currentIndex = 0;
+  score = 0;
+  scoreEl.textContent = 0;
+  nextBtn.textContent = "Next →";
+  resultScreen.classList.add("hidden");
+  quizScreen.classList.remove("hidden");
+  loadQuestion();
+}
+  </script>
+</body>
+</html>
+
